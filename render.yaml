@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: qa-console-gateway
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: QA_CONSOLE_USER
+        value: qa
+      - key: QA_CONSOLE_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: REGRESSION_APP_URL
+        value: https://regression-gohanpass-web.onrender.com
+      - key: VALIDATOR_APP_URL
+        value: https://gohanpass-web-validator.onrender.com
+      - key: SECURE_COOKIE
+        value: "true"

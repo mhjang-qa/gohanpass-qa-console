@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}">
+  </head>
+  <body class="console-body">
+    <div class="console-shell">
+      <header class="console-header">
+        <div class="header-title">
+          <span class="brand-mark">QA</span>
+          <div>
+            <h1>{{ app_name }}</h1>
+            <p id="currentServiceName">{{ services[0].name }}</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <span class="user-chip">{{ user }}</span>
+          <form method="post" action="/logout">
+            <button class="ghost-button" type="submit">로그아웃</button>
+          </form>
+        </div>
+      </header>
+
+      <nav class="service-tabs" aria-label="QA service tabs">
+        {% for service in services %}
+          <button
+            type="button"
+            class="service-tab {% if loop.first %}active{% endif %}"
+            data-service-key="{{ service.key }}"
+            data-service-name="{{ service.name }}"
+            data-service-description="{{ service.description }}"
+            data-service-url="{{ service.url }}"
+            aria-selected="{% if loop.first %}true{% else %}false{% endif %}"
+          >
+            {{ service.name }}
+          </button>
+        {% endfor %}
+      </nav>
+
+      <section class="service-meta" aria-live="polite">
+        <div>
+          <h2 id="serviceTitle">{{ services[0].name }}</h2>
+          <p id="serviceDescription">{{ services[0].description }}</p>
+        </div>
+        <a id="openExternal" class="external-button" href="{{ services[0].url }}" target="_blank" rel="noopener noreferrer">
+          새 창 열기
+        </a>
+      </section>
+
+      <main class="iframe-stage">
+        <div id="loadingState" class="loading-state">서비스 화면을 불러오는 중입니다.</div>
+        <div id="failureState" class="failure-state" hidden>
+          <strong>iframe 화면을 표시하지 못했을 수 있습니다.</strong>
+          <span>X-Frame-Options 또는 CSP frame-ancestors 정책으로 차단된 경우 새 창으로 열어 확인하세요.</span>
+          <a id="failureOpenExternal" href="{{ services[0].url }}" target="_blank" rel="noopener noreferrer">새 창에서 열기</a>
+        </div>
+        <iframe
+          id="serviceFrame"
+          title="{{ services[0].name }}"
+          src="{{ services[0].url }}"
+          referrerpolicy="no-referrer-when-downgrade"
+          allow="clipboard-read; clipboard-write"
+        ></iframe>
+      </main>
+    </div>
+    <script src="{{ url_for('static', path='/js/app.js') }}"></script>
+  </body>
+</html>
