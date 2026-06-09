@@ -10,6 +10,7 @@ const failureState = document.querySelector("#failureState");
 
 let activeLoadToken = 0;
 let loadTimer = null;
+let activeServiceKey = tabs[0]?.dataset.serviceKey || "";
 
 function setLoadingState(isLoading) {
   loadingState.hidden = !isLoading;
@@ -24,6 +25,18 @@ function hideFailure() {
   failureState.hidden = true;
 }
 
+async function fetchLaunch(serviceKey) {
+  const response = await fetch(`/api/services/${encodeURIComponent(serviceKey)}/launch`, {
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new Error(`launch request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 function armFrameTimeout(serviceUrl, token) {
   window.clearTimeout(loadTimer);
   loadTimer = window.setTimeout(() => {
@@ -34,8 +47,9 @@ function armFrameTimeout(serviceUrl, token) {
   }, 9000);
 }
 
-function activateService(tab) {
+async function activateService(tab) {
   const { serviceKey, serviceName, serviceDescription: description, serviceUrl } = tab.dataset;
+  activeServiceKey = serviceKey;
 
   tabs.forEach((item) => {
     const isActive = item.dataset.serviceKey === serviceKey;
@@ -56,14 +70,52 @@ function activateService(tab) {
   const token = activeLoadToken;
   armFrameTimeout(serviceUrl, token);
 
-  if (frame.src !== serviceUrl) {
-    frame.src = serviceUrl;
+  try {
+    const launch = await fetchLaunch(serviceKey);
+    if (token !== activeLoadToken) {
+      return;
+    }
+
+    openExternal.href = launch.externalUrl || serviceUrl;
+    failureOpenExternal.href = launch.externalUrl || serviceUrl;
+
+    if (frame.src !== launch.launchUrl) {
+      frame.src = launch.launchUrl;
+    }
+  } catch (_error) {
+    if (token !== activeLoadToken) {
+      return;
+    }
+    setLoadingState(false);
+    showFailure(serviceUrl);
   }
 }
 
 tabs.forEach((tab) => {
-  tab.addEventListener("click", () => activateService(tab));
+  tab.addEventListener("click", () => {
+    activateService(tab).catch(() => {
+      showFailure(tab.dataset.serviceUrl);
+    });
+  });
 });
+
+async function openCurrentServiceInNewWindow(event) {
+  event.preventDefault();
+
+  if (!activeServiceKey) {
+    return;
+  }
+
+  try {
+    const launch = await fetchLaunch(activeServiceKey);
+    window.open(launch.externalUrl || launch.launchUrl, "_blank", "noopener,noreferrer");
+  } catch (_error) {
+    window.open(openExternal.href, "_blank", "noopener,noreferrer");
+  }
+}
+
+openExternal.addEventListener("click", openCurrentServiceInNewWindow);
+failureOpenExternal.addEventListener("click", openCurrentServiceInNewWindow);
 
 frame.addEventListener("load", () => {
   window.clearTimeout(loadTimer);
@@ -77,5 +129,7 @@ frame.addEventListener("error", () => {
 });
 
 if (tabs[0]) {
-  armFrameTimeout(tabs[0].dataset.serviceUrl, activeLoadToken);
+  activateService(tabs[0]).catch(() => {
+    showFailure(tabs[0].dataset.serviceUrl);
+  });
 }

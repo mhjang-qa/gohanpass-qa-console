@@ -2,6 +2,7 @@ import logging
 import os
 import secrets
 from dataclasses import dataclass
+from urllib.parse import urljoin
 
 
 LOGGER = logging.getLogger("qa_console_gateway")
@@ -13,6 +14,15 @@ class ServiceConfig:
     name: str
     description: str
     url: str
+    target: str
+
+    @property
+    def launch_url(self) -> str:
+        return urljoin(f"{self.url.rstrip('/')}/", "sso/launch")
+
+    @property
+    def logout_url(self) -> str:
+        return urljoin(f"{self.url.rstrip('/')}/", "sso/logout")
 
 
 @dataclass(frozen=True)
@@ -21,6 +31,8 @@ class Settings:
     console_user: str
     console_password: str
     session_secret: str
+    shared_secret: str
+    token_expire_minutes: int
     secure_cookie: bool
     services: tuple[ServiceConfig, ...]
 
@@ -37,12 +49,26 @@ def _read_session_secret() -> str:
     return secrets.token_urlsafe(48)
 
 
+def _read_shared_secret() -> str:
+    secret = os.getenv("QA_CONSOLE_SHARED_SECRET", "").strip()
+    if secret:
+        return secret
+
+    LOGGER.warning(
+        "QA_CONSOLE_SHARED_SECRET is not set. Console SSO launch tokens are disabled "
+        "until a shared secret is configured in the console and child services."
+    )
+    return ""
+
+
 def get_settings() -> Settings:
     return Settings(
         app_name=os.getenv("QA_CONSOLE_NAME", "GO Hanpass QA Console"),
         console_user=os.getenv("QA_CONSOLE_USER", "qa"),
         console_password=os.getenv("QA_CONSOLE_PASSWORD", "qa"),
         session_secret=_read_session_secret(),
+        shared_secret=_read_shared_secret(),
+        token_expire_minutes=max(1, int(os.getenv("QA_CONSOLE_TOKEN_EXPIRE_MINUTES", "10"))),
         secure_cookie=os.getenv("SECURE_COOKIE", "true").lower() in {"1", "true", "yes", "on"},
         services=(
             ServiceConfig(
@@ -53,6 +79,7 @@ def get_settings() -> Settings:
                     "REGRESSION_APP_URL",
                     "https://regression-gohanpass-web.onrender.com",
                 ),
+                target="regression",
             ),
             ServiceConfig(
                 key="validator",
@@ -62,6 +89,7 @@ def get_settings() -> Settings:
                     "VALIDATOR_APP_URL",
                     "https://gohanpass-web-validator.onrender.com",
                 ),
+                target="validator",
             ),
         ),
     )

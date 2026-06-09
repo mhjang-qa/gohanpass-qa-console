@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="1;url=/login">
+    <title>Logout</title>
+  </head>
+  <body>
+    {% for logout_url in logout_urls %}
+      <iframe src="{{ logout_url }}" title="logout-cleanup-{{ loop.index }}" hidden></iframe>
+    {% endfor %}
+    <script>
+      window.setTimeout(() => {
+        window.location.replace("/login");
+      }, 900);
+    </script>
+  </body>
+</html>

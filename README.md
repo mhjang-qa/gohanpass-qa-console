@@ -1,6 +1,6 @@
 # QA Console Gateway
 
-FastAPI 기반 통합 Gateway입니다. 사용자는 이 콘솔에 한 번 로그인한 뒤 상단 탭으로 기존 Render 서비스 2개를 전환해서 사용할 수 있습니다.
+FastAPI 기반 통합 Gateway입니다. 사용자는 이 콘솔에 한 번 로그인한 뒤 상단 탭으로 기존 Render 서비스 2개를 전환해서 사용할 수 있습니다. 콘솔은 하위 서비스 진입용 signed SSO launch URL을 발급하고, 하위 서비스는 이 토큰을 검증한 경우에만 로그인 화면을 건너뜁니다.
 
 ## 대상 서비스
 
@@ -30,11 +30,13 @@ SESSION_SECRET=local-dev-secret uvicorn app.main:app --reload --host 127.0.0.1 -
 | `QA_CONSOLE_USER` | `qa` | Gateway 로그인 ID |
 | `QA_CONSOLE_PASSWORD` | `qa` | Gateway 로그인 비밀번호 |
 | `SESSION_SECRET` | 없음 | signed cookie 서명 키 |
+| `QA_CONSOLE_SHARED_SECRET` | 없음 | 하위 서비스 SSO launch token 서명 키 |
+| `QA_CONSOLE_TOKEN_EXPIRE_MINUTES` | `10` | 하위 서비스 진입 토큰 만료 시간 |
 | `REGRESSION_APP_URL` | `https://regression-gohanpass-web.onrender.com` | 결함 회귀 테스트 iframe URL |
 | `VALIDATOR_APP_URL` | `https://gohanpass-web-validator.onrender.com` | 웹 자동 검증 iframe URL |
 | `SECURE_COOKIE` | `true` | HTTPS secure cookie 사용 여부 |
 
-운영 환경에서는 `QA_CONSOLE_USER`, `QA_CONSOLE_PASSWORD`, `SESSION_SECRET`을 반드시 환경변수로 설정하세요. `SESSION_SECRET`이 없으면 앱은 임시 secret을 생성하고 경고 로그를 출력합니다. 이 경우 프로세스 재시작 시 기존 세션은 모두 무효화됩니다.
+운영 환경에서는 `QA_CONSOLE_USER`, `QA_CONSOLE_PASSWORD`, `SESSION_SECRET`, `QA_CONSOLE_SHARED_SECRET`을 반드시 환경변수로 설정하세요. `SESSION_SECRET`이 없으면 앱은 임시 secret을 생성하고 경고 로그를 출력합니다. `QA_CONSOLE_SHARED_SECRET`이 없으면 콘솔 로그인 자체는 동작하지만 하위 서비스 SSO bypass URL은 발급되지 않습니다.
 
 ## Render 배포
 
@@ -55,10 +57,20 @@ Render 환경변수에서 최소 아래 값을 설정합니다.
 QA_CONSOLE_USER=qa
 QA_CONSOLE_PASSWORD=<운영 비밀번호>
 SESSION_SECRET=<충분히 긴 랜덤 문자열>
+QA_CONSOLE_SHARED_SECRET=<console-child 공통 랜덤 문자열>
+QA_CONSOLE_TOKEN_EXPIRE_MINUTES=10
 REGRESSION_APP_URL=https://regression-gohanpass-web.onrender.com
 VALIDATOR_APP_URL=https://gohanpass-web-validator.onrender.com
 SECURE_COOKIE=true
 ```
+
+## SSO 동작
+
+- 콘솔 로그인 성공 후 탭을 누를 때마다 서비스별 signed launch URL을 새로 발급합니다.
+- launch URL payload에는 `source`, `user`, `target`, `exp`가 포함됩니다.
+- 하위 서비스는 launch URL을 직접 검증하고, 성공하면 내부 인증 상태를 저장한 뒤 메인 화면으로 리다이렉트합니다.
+- 토큰 만료 또는 검증 실패 시 하위 서비스는 기존 로그인 화면으로 fallback 합니다.
+- 콘솔 로그아웃 시 각 하위 서비스의 `/sso/logout`을 hidden iframe으로 호출해 저장된 인증 상태를 함께 비웁니다.
 
 ## iframe 차단 확인
 
